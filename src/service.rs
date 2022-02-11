@@ -1,21 +1,30 @@
 use std::collections::HashMap;
+use std::sync::{Arc};
+use tokio::sync::{RwLock};
 
 use tonic::Code;
 
 use crate::proto::datamap::data_map_server::{DataMap, DataMapServer};
 use crate::proto::datamap;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct DataMapService {
-    // use std::sync::Mutex as recommended by tokio
-    map: std::sync::Mutex<HashMap<String, i64>>,
+    map: Arc<RwLock<HashMap<String, i64>>>,
+}
+
+impl DataMapService {
+    fn new(map: Arc<RwLock<HashMap<String, i64>>>) -> Self {
+        DataMapService {
+            map,
+        }
+    }
 }
 
 #[tonic::async_trait]
 impl DataMap for DataMapService {
     async fn get(&self,request:tonic::Request<datamap::GetRequest>,) -> Result<tonic::Response<datamap::GetResponse>,tonic::Status> {
         let key = request.into_inner().key;
-        let map = self.map.lock().expect("Mutex: poisoned lock");
+        let map = self.map.read().await;
         map.get(&key)
             .map(|val|
                 res(datamap::GetResponse { value: *val })
@@ -26,7 +35,7 @@ impl DataMap for DataMapService {
         let req = request.into_inner();
         let key = req.key;
         let val = req.value;
-        let mut map = self.map.lock().expect("Mutex: poisoned lock");
+        let mut map = self.map.write().await;
         if map.contains_key(&key) {
             Err(conflict())
         } else {
@@ -39,7 +48,7 @@ impl DataMap for DataMapService {
         let req = request.into_inner();
         let key = req.key;
         let new_val = req.value;
-        let mut map = self.map.lock().expect("Mutex: poisoned lock");
+        let mut map = self.map.write().await;
         map.get_mut(&key)
             .map(|val| {
                 *val = new_val;
@@ -50,7 +59,7 @@ impl DataMap for DataMapService {
 
     async fn drop(&self,request:tonic::Request<datamap::DropRequest>,) -> Result<tonic::Response<datamap::DropResponse>,tonic::Status> {
         let key = request.into_inner().key;
-        let mut map = self.map.lock().expect("Mutex: poisoned lock");
+        let mut map = self.map.write().await;
         match map.remove(&key) {
             Some(_) => Ok(res(datamap::DropResponse {})),
             None => Err(key_not_found()),
@@ -58,7 +67,7 @@ impl DataMap for DataMapService {
     }
 
     async fn get_entries(&self,_:tonic::Request<datamap::GetEntriesRequest> ,) ->  Result<tonic::Response<datamap::GetEntriesResponse> ,tonic::Status> {
-        let map = self.map.lock().expect("Mutex: poisoned lock");
+        let map = self.map.read().await;
         Ok(res(datamap::GetEntriesResponse {
             entries: map.iter()
                 .map(|(key, value)|
@@ -78,8 +87,8 @@ impl DataMap for DataMapService {
 }
 
 #[inline]
-pub fn datamap_server() -> DataMapServer<DataMapService> {
-    DataMapServer::new(DataMapService::default())
+pub fn datamap_server(map: Arc<RwLock<HashMap<String, i64>>>) -> DataMapServer<DataMapService> {
+    DataMapServer::new(DataMapService::new(map))
 }
 
 #[inline]
