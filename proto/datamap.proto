@@ -6,23 +6,11 @@ service DataMap {
   rpc Create (CreateRequest) returns (CreateResponse);
   rpc Update (UpdateRequest) returns (UpdateResponse);
   rpc Drop   (DropRequest)   returns (DropResponse);
+  rpc GetEntries (GetEntriesRequest) returns (GetEntriesResponse);
+  rpc Flush  (FlushRequest) returns (FlushResponse);
 }
 
 message GetRequest {
-  string key = 1;
-}
-
-message CreateRequest {
-  string key = 1;
-  int64 value = 2;
-}
-
-message UpdateRequest {
-  string key = 1;
-  int64 value = 2;
-}
-
-message DropRequest {
   string key = 1;
 }
 
@@ -30,11 +18,43 @@ message GetResponse {
   int64 value = 1;
 }
 
+message CreateRequest {
+  string key = 1;
+  int64 value = 2;
+}
+
 message CreateResponse {
+}
+
+message UpdateRequest {
+  string key = 1;
+  int64 value = 2;
 }
 
 message UpdateResponse {
 }
 
+message DropRequest {
+  string key = 1;
+}
+
 message DropResponse {
+}
+
+message GetEntriesRequest {
+}
+
+message GetEntriesResponse {
+  repeated Entry entries = 1;
+}
+
+message Entry {
+  string key = 1;
+  int64 value = 2;
+}
+
+message FlushRequest {
+}
+
+message FlushResponse {
 }
