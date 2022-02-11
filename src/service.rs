@@ -1,20 +1,24 @@
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::sync::{Arc};
 use tokio::sync::{RwLock};
 
 use tonic::Code;
 
+use crate::jsonfile;
 use crate::proto::datamap::data_map_server::{DataMap, DataMapServer};
 use crate::proto::datamap;
 
 #[derive(Debug)]
 pub struct DataMapService {
+    file_loc: String,
     map: Arc<RwLock<HashMap<String, i64>>>,
 }
 
 impl DataMapService {
-    fn new(map: Arc<RwLock<HashMap<String, i64>>>) -> Self {
+    fn new(file_loc: String, map: Arc<RwLock<HashMap<String, i64>>>) -> Self {
         DataMapService {
+            file_loc,
             map,
         }
     }
@@ -80,15 +84,18 @@ impl DataMap for DataMapService {
     }
 
 
-    async fn flush(&self,request:tonic::Request<datamap::FlushRequest> ,) -> Result<tonic::Response<datamap::FlushResponse> ,tonic::Status> {
-        todo!()
+    async fn flush(&self,_:tonic::Request<datamap::FlushRequest> ,) -> Result<tonic::Response<datamap::FlushResponse> ,tonic::Status> {
+        match jsonfile::write_json(&self.file_loc, self.map.deref()).await {
+            Some(_) => Ok(res(datamap::FlushResponse {})),
+            None => Err(internal_err()),
+        }
     }
 
 }
 
 #[inline]
-pub fn datamap_server(map: Arc<RwLock<HashMap<String, i64>>>) -> DataMapServer<DataMapService> {
-    DataMapServer::new(DataMapService::new(map))
+pub fn datamap_server(file_loc: String, map: Arc<RwLock<HashMap<String, i64>>>) -> DataMapServer<DataMapService> {
+    DataMapServer::new(DataMapService::new(file_loc, map))
 }
 
 #[inline]
@@ -104,4 +111,9 @@ fn key_not_found() -> tonic::Status {
 #[inline]
 fn conflict() -> tonic::Status {
     tonic::Status::new(Code::AlreadyExists, "key already exists")
+}
+
+#[inline]
+fn internal_err() -> tonic::Status {
+    tonic::Status::new(Code::Internal, "flushing error")
 }

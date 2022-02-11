@@ -45,7 +45,7 @@ async fn main() {
     ));
 
     Server::builder()
-        .add_service(service::datamap_server(Arc::clone(&map)))
+        .add_service(service::datamap_server(json_path.clone(), Arc::clone(&map)))
         .serve_with_shutdown(address, wait_for_ctrl_c(&json_path, &map))
         .await.unwrap();
     
