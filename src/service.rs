@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::ops::Deref;
 use std::sync::{Arc};
+use tokio::join;
 use tokio::sync::{RwLock};
 
 use tonic::Code;
@@ -13,6 +13,7 @@ use crate::proto::datamap;
 pub struct DataMapService {
     file_loc: String,
     map: Arc<RwLock<HashMap<String, i64>>>,
+    freqs: Arc<RwLock<HashMap<String, u32>>>,
 }
 
 impl DataMapService {
@@ -20,6 +21,7 @@ impl DataMapService {
         DataMapService {
             file_loc,
             map,
+            freqs: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
@@ -28,11 +30,16 @@ impl DataMapService {
 impl DataMap for DataMapService {
     async fn get(&self,request:tonic::Request<datamap::GetRequest>,) -> Result<tonic::Response<datamap::GetResponse>,tonic::Status> {
         let key = request.into_inner().key;
-        let map = self.map.read().await;
+        let (map, mut freqs) = join!(self.map.read(), self.freqs.write());
         map.get(&key)
-            .map(|val|
+            .map(|val| {
+                if let Some(fk) = freqs.get_mut(&key) {
+                    *fk += 1;
+                } else {
+                    freqs.insert(key, 1);
+                }
                 res(datamap::GetResponse { value: *val })
-            ).ok_or(key_not_found())
+            }).ok_or(key_not_found())
     }
 
     async fn create(&self, request:tonic::Request<datamap::CreateRequest>) -> Result<tonic::Response<datamap::CreateResponse>,tonic::Status> {
@@ -83,14 +90,27 @@ impl DataMap for DataMapService {
         }))
     }
 
-
     async fn flush(&self,_:tonic::Request<datamap::FlushRequest> ,) -> Result<tonic::Response<datamap::FlushResponse> ,tonic::Status> {
-        match jsonfile::write_json(&self.file_loc, self.map.deref()).await {
+        match jsonfile::write_json(&self.file_loc, &self.map).await {
             Some(_) => Ok(res(datamap::FlushResponse {})),
             None => Err(internal_err()),
         }
     }
 
+    async fn get_read_summary(&self,_:tonic::Request<datamap::GetReadSummaryRequest>) -> Result<tonic::Response<datamap::GetReadSummaryResponse>,tonic::Status> {
+        let map = self.freqs.read().await;
+        Ok(res(
+            datamap::GetReadSummaryResponse { freqs: 
+                map.iter()
+                    .map(|(k, f)|
+                        datamap::ReadFrequency {
+                            key: k.clone(),
+                            freq: f.clone(),
+                        }
+                    ).collect()
+            }
+        ))
+    }
 }
 
 #[inline]

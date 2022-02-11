@@ -8,6 +8,7 @@ service DataMap {
   rpc Drop   (DropRequest)   returns (DropResponse);
   rpc GetEntries (GetEntriesRequest) returns (GetEntriesResponse);
   rpc Flush  (FlushRequest) returns (FlushResponse);
+  rpc GetReadSummary (GetReadSummaryRequest) returns (GetReadSummaryResponse);
 }
 
 message GetRequest {
@@ -57,4 +58,16 @@ message FlushRequest {
 }
 
 message FlushResponse {
+}
+
+message GetReadSummaryRequest {
+}
+
+message GetReadSummaryResponse {
+  repeated ReadFrequency freqs = 1;
+}
+
+message ReadFrequency {
+  string key = 1;
+  uint32 freq = 2;
 }
