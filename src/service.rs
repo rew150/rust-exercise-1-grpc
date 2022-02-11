@@ -2,28 +2,13 @@ use std::collections::HashMap;
 
 use tonic::Code;
 
-use crate::proto::datamap::data_map_server::{DataMap};
+use crate::proto::datamap::data_map_server::{DataMap, DataMapServer};
 use crate::proto::datamap;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DataMapService {
     // use std::sync::Mutex as recommended by tokio
     map: std::sync::Mutex<HashMap<String, i64>>,
-}
-
-#[inline]
-fn res<T>(body: T) -> tonic::Response<T> {
-    tonic::Response::new(body)
-}
-
-#[inline]
-fn key_not_found() -> tonic::Status {
-    tonic::Status::new(Code::NotFound, "key not found")
-}
-
-#[inline]
-fn conflict() -> tonic::Status {
-    tonic::Status::new(Code::AlreadyExists, "key already exists")
 }
 
 #[tonic::async_trait]
@@ -71,4 +56,24 @@ impl DataMap for DataMapService {
             None => Err(key_not_found()),
         }
     }
+}
+
+#[inline]
+pub fn datamap_server() -> DataMapServer<DataMapService> {
+    DataMapServer::new(DataMapService::default())
+}
+
+#[inline]
+fn res<T>(body: T) -> tonic::Response<T> {
+    tonic::Response::new(body)
+}
+
+#[inline]
+fn key_not_found() -> tonic::Status {
+    tonic::Status::new(Code::NotFound, "key not found")
+}
+
+#[inline]
+fn conflict() -> tonic::Status {
+    tonic::Status::new(Code::AlreadyExists, "key already exists")
 }
