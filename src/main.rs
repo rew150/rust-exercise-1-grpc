@@ -15,7 +15,11 @@ static DEFAULT_JSON_PATH: &str = "./data/data.json";
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    dotenv().unwrap();
+    if let Ok(_) = dotenv() {
+        println!(".env loaded");
+    } else {
+        println!(".env not loaded");
+    }
 
     let address = match env::var("ADDRESS") {
         Ok(a) => {
